@@ -91,13 +91,6 @@ spec:
           name: accounts-db
           ports:
             - containerPort: 5432
-          resources:
-            limits:
-              cpu: 250m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: postgresdb

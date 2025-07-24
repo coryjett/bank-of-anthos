@@ -69,7 +69,7 @@ spec:
             - name: PORT
               value: "8080"
             - name: ENABLE_TRACING
-              value: "true"
+              value: "false"
             - name: SCHEME
               value: http
             - name: LOG_LEVEL
@@ -117,13 +117,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 10
-          resources:
-            limits:
-              cpu: 250m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
