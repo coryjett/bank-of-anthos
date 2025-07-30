@@ -314,11 +314,10 @@ for context in ${CLUSTER1} ${CLUSTER2}; do
   kubectl --context ${context} label namespace default istio.io/dataplane-mode=ambient
 done
 ````
-
-Enable `frontend` to be multi-cluster on both clusters
+Label the `frontend` service in both clusters as a global service
 
 ```
-for context in ${CLUSTER1} ${CLUSTER2}; do
+for context in ${CLUSTER1} ${CLUSTER2}; do                             
   kubectl --context ${context}  label service frontend solo.io/service-scope=global
   kubectl --context ${context}  annotate service frontend networking.istio.io/traffic-distribution=Any
 done
@@ -394,15 +393,6 @@ spec:
       name: frontend.default.mesh.internal
       port: 80
 EOF
-```
-
-Label the gateway in both clusters to be global
-
-```
-for context in ${CLUSTER1} ${CLUSTER2}; do                             
-  kubectl --context ${context}  label service boa-gateway-istio solo.io/service-scope=global
-  kubectl --context ${context}  annotate service boa-gateway-istio networking.istio.io/traffic-distribution=Any
-done
 ```
 
 ### Deploy the Gloo Management Plane
