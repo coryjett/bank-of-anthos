@@ -395,6 +395,12 @@ spec:
 EOF
 ```
 
+Setup a port-forward to the Gateway instance
+
+`kubectl port-forward svc/boa-gateway-istio 8080:80`
+
+Navigate to http://localhost:8080/
+
 ### Deploy the Gloo Management Plane
 
 Optionally, you can deploy the Gloo Management Plane that provides many benefits and features. For this lab, we'll just focus on the UI and the service graph.
@@ -491,13 +497,11 @@ Launch the UI
 
 `kubectl -n gloo-mesh port-forward deployment/gloo-mesh-ui 8090`
 
-http://localhost:8090/
+Navigate to http://localhost:8090/
 
 or 
 
 `meshctl dashboard`
-
-Navigate to http://localhost:8080/
 
 Under `Observability/Tracing`, you should see a graph similar to this:
 
