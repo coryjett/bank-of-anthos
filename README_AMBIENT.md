@@ -1,8 +1,10 @@
 ### ENV
 
+Deploy two Kubernetes clusters and then continue.
+
 ```
-export CLUSTER1=gke_ambient_one # UPDATE THIS
-export CLUSTER2=gke_ambient_two # UPDATE THIS
+export CLUSTER1=cluster1
+export CLUSTER2=cluster2
 export GLOO_MESH_LICENSE_KEY=<update>  # UPDATE THIS
 
 export ISTIO_VERSION=1.26.2
@@ -19,7 +21,7 @@ OS=$(uname | tr '[:upper:]' '[:lower:]' | sed -E 's/darwin/osx/')
 ARCH=$(uname -m | sed -E 's/aarch/arm/; s/x86_64/amd64/; s/armv7l/armv7/')
 
 mkdir -p ~/.istioctl/bin
-curl -sSL https://storage.googleapis.com/istio-binaries-d4cba2aff3ef/1.26.2-solo/istioctl-1.26.2-solo-${OS}-${ARCH}.tar.gz | tar xzf - -C ~/.istioctl/bin
+curl -sSL https://storage.googleapis.com/istio-binaries-d4cba2aff3ef/1.26.0-solo/istioctl-1.26.0-solo-${OS}-${ARCH}.tar.gz | tar xzf - -C ~/.istioctl/bin
 chmod +x ~/.istioctl/bin/istioctl
 
 export PATH=${HOME}/.istioctl/bin:${PATH}
@@ -179,7 +181,6 @@ global:
   hub: ${REPO}
   tag: ${ISTIO_IMAGE}
   variant: distroless
-  # platform: gke # UNCOMMENT FOR GKE
 profile: ambient
 EOF
 ```
@@ -200,7 +201,6 @@ global:
   hub: ${REPO}
   tag: ${ISTIO_IMAGE}
   variant: distroless
-  # platform: gke # UNCOMMENT FOR GKE
 profile: ambient
 EOF
 ```
@@ -307,7 +307,7 @@ transactionhistory-5569754896-z94cn   1/1     Running   0          97s
 userservice-78dc876bff-pdhtl          1/1     Running   0          96s
 ```
 
-#### Enable Istio for Bank of Anthos
+### Enable Istio for Bank of Anthos
 
 ```
 for context in ${CLUSTER1} ${CLUSTER2}; do
@@ -324,7 +324,88 @@ for context in ${CLUSTER1} ${CLUSTER2}; do
 done
 ```
 
-#### Deploy the Gloo Management Plane
+### Expose Bank of Anthos using Istio Gateway
+
+Apply the following Kubernetes Gateway API resources to cluster1 and cluster2 to expose the frontend service using an Istio gateway:
+
+```
+kubectl --context=${CLUSTER1} apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: boa-gateway
+  namespace: default
+spec:
+  gatewayClassName: istio
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: boa-httproute
+  namespace: default
+spec:
+  parentRefs:
+  - name: boa-gateway
+  rules:
+  - backendRefs:
+    - kind: Hostname
+      group: networking.istio.io
+      name: frontend.default.mesh.internal
+      port: 80
+EOF
+```
+
+```
+kubectl --context=${CLUSTER2} apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: boa-gateway
+  namespace: default
+spec:
+  gatewayClassName: istio
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: boa-httproute
+  namespace: default
+spec:
+  parentRefs:
+  - name: boa-gateway
+  rules:
+  - backendRefs:
+    - kind: Hostname
+      group: networking.istio.io
+      name: frontend.default.mesh.internal
+      port: 80
+EOF
+```
+
+Label the gateway in both clusters to be global
+
+```
+for context in ${CLUSTER1} ${CLUSTER2}; do                             
+  kubectl --context ${context}  label service boa-gateway-istio solo.io/service-scope=global
+  kubectl --context ${context}  annotate service boa-gateway-istio networking.istio.io/traffic-distribution=Any
+done
+```
+
+### Deploy the Gloo Management Plane
 
 Optionally, you can deploy the Gloo Management Plane that provides many benefits and features. For this lab, we'll just focus on the UI and the service graph.
 
@@ -335,7 +416,7 @@ helm repo add gloo-platform https://storage.googleapis.com/gloo-platform/helm-ch
 helm repo update
 
 helm upgrade --kube-context ${CLUSTER1} -i gloo-platform-crds gloo-platform/gloo-platform-crds -n gloo-mesh --create-namespace --version=2.7.1
-helm upgrade --kube-context ${CLUSTER1} -i gloo-platform gloo-platform/gloo-platform -n gloo-mesh --version 2.7.1 --values mgmt-values.yaml --set licensing.glooMeshLicenseKey=$GLOO_MESH_LICENSE_KEY
+helm upgrade --kube-context ${CLUSTER1} -i gloo-platform gloo-platform/gloo-platform -n gloo-mesh --version 2.7.1 --values gloo-mgmt-values.yaml --set licensing.glooMeshLicenseKey=$GLOO_MESH_LICENSE_KEY
 ```
 
 Then, you need to set the environment variables with the management plane addresses. These variables will be used to configure the Gloo Mesh agents in cluster2:
@@ -420,6 +501,10 @@ Launch the UI
 
 `kubectl -n gloo-mesh port-forward deployment/gloo-mesh-ui 8090`
 
+http://localhost:8090/
+
 or 
 
 `meshctl dashboard`
+
+Navigate to http://localhost:8080/

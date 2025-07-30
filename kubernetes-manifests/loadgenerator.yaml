@@ -41,7 +41,8 @@ spec:
       containers:
         - env:
             - name: FRONTEND_ADDR
-              value: frontend.default.mesh.internal:80
+              #value: frontend.default.mesh.internal:80
+              value: boa-gateway-istio.default.mesh.internal:80
             - name: USERS
               value: "5"
             - name: LOG_LEVEL
