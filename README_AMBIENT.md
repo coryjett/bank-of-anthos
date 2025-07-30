@@ -498,3 +498,7 @@ or
 `meshctl dashboard`
 
 Navigate to http://localhost:8080/
+
+Under `Observability/Tracing`, you should see a graph similar to this:
+
+![service graph](./images/service_graph.png)
