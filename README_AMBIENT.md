@@ -314,6 +314,32 @@ for context in ${CLUSTER1} ${CLUSTER2}; do
   kubectl --context ${context} label namespace default istio.io/dataplane-mode=ambient
 done
 ````
+
+Verify that the services are using Ambient
+
+`istioctl zc workloads`
+
+You should see the `PROTOCOL` listed as `HBONE`
+
+```
+NAMESPACE          POD NAME                                    ADDRESS       NODE                WAYPOINT PROTOCOL
+default            accounts-db-0                               10.102.158.20 kind2-control-plane None     HBONE
+```
+
+In the `ztunnel` pod logs, you should also see an entry similar to the one below for each service in `Bank of Anthos` letting you know that ztunnel discovered it and added it to the mesh
+
+`k logs -n istio-system ztunnel-zd576`
+
+```
+2025-08-05T13:41:15.592843Z	info	xds::client:xds{id=2}	received response	type_url="type.googleapis.com/istio.workload.Address" size=10 removes=0
+2025-08-05T13:41:15.713121Z	info	inpod::statemanager	pod received, starting proxy	uid="ec7115b2-652a-461e-ab87-0a53e5e226d8" name="accounts-db-0" namespace="default"
+2025-08-05T13:41:15.713376Z	info	dns::server	starting local DNS server	address=localhost:15053 component="dns"
+2025-08-05T13:41:15.713464Z	info	proxy::inbound	listener established	address=[::]:15008 component="inbound" transparent=true
+2025-08-05T13:41:15.713483Z	info	proxy::inbound_passthrough	listener established	address=[::]:15006 component="inbound plaintext" transparent=true
+2025-08-05T13:41:15.713490Z	info	proxy::outbound	listener established	address=[::]:15001 component="outbound" transparent=true
+...
+```
+
 Label the `frontend` service in both clusters as a global service
 
 ```
@@ -321,6 +347,100 @@ for context in ${CLUSTER1} ${CLUSTER2}; do
   kubectl --context ${context}  label service frontend solo.io/service-scope=global
   kubectl --context ${context}  annotate service frontend networking.istio.io/traffic-distribution=Any
 done
+```
+
+When the gatway was created, it was configured to send traffic to `frontend.default.mesh.internal`.  You should now see ztunnel logs showing traffic going to that global service.
+
+```
+2025-08-05T14:11:05.885979Z	info	http access	request complete	src.addr=10.102.158.31:52134 src.workload="boa-gateway-istio-5c9c8c9b86-tbrdm" src.namespace="default" src.identity="spiffe://cluster.local/ns/default/sa/boa-gateway-istio" dst.addr=10.102.158.39:15008 dst.hbone_addr=10.102.158.39:8080 dst.service="frontend.default.mesh.internal" dst.workload="frontend-f88c65c8c-gzk9r" dst.namespace="default" dst.identity="spiffe://cluster.local/ns/default/sa/bank-of-anthos" direction="inbound" method=GET path="/home?msg=Deposit+successful" protocol=HTTP1 response_code=200 host="boa-gateway-istio" user_agent="python-requests/2.32.3" request_id="560382d0-c91b-4677-ac36-7529adcae63e" duration="69ms"
+```
+
+You can also verify the the global service several other ways:
+
+`istioctl ztunnel-config services` will now show `2/2` endpoints
+
+```
+NAMESPACE      SERVICE NAME                       SERVICE VIP           WAYPOINT ENDPOINTS
+default        autogen.default.frontend           240.240.0.8,2001:2::8 auto     2/2
+```
+
+`istioctl ztunnel-config workloads` will show a `autogen` workload using `HBONE`
+
+```
+➜  bank-of-anthos git:(main) ✗ istioctl ztunnel-config workloads
+NAMESPACE          POD NAME                                    ADDRESS       NODE                WAYPOINT PROTOCOL
+default            autogen.cluster2.default.frontend                                             None     HBONE
+```
+
+`istioctl ztunnel-config connections|grep frontend` will now show a connection coming in through the `istio-eastwest` gateway from the peer cluster
+
+```
+WORKLOAD                           DIRECTION   LOCAL                                    REMOTE                                                REMOTE TARGET    PROTOCOL
+frontend-f88c65c8c-gzk9r.default   Inbound     frontend-f88c65c8c-gzk9r.default:8080    istio-eastwest-d88fcc96-rtvnz.istio-gateways:36138                     HBONE
+frontend-f88c65c8c-gzk9r.default   Inbound     frontend-f88c65c8c-gzk9r.default:8080    istio-eastwest-d88fcc96-rtvnz.istio-gateways:36122                     HBONE
+```
+
+### Add a waypoint for the `default` namespace
+
+```
+for context in ${CLUSTER1} ${CLUSTER2}; do
+  kubectl --context=${context} label ns default istio.io/use-waypoint=auto
+done
+```
+
+This can be verified by running `istioctl ztunnel-config services` and noting that `waypoint` is set to `auto`
+
+```
+NAMESPACE      SERVICE NAME                       SERVICE VIP           WAYPOINT ENDPOINTS
+default        accounts-db                        10.2.221.155          auto     1/1
+```
+
+### Configure a route for the waypoint to load-balance the `ledgerwriter` service across two backends 
+
+```
+kubectl --context=${CLUSTER1} apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ledgerwriter
+  namespace: default
+spec:
+  parentRefs:
+  - group: ""
+    kind: Service
+    name: ledgerwriter
+    port: 9080
+  rules:
+  - backendRefs:
+    - name: ledgerwriter-1
+      port: 8080
+  - backendRefs:
+    - name: ledgerwriter-2
+      port: 8080
+EOF
+```
+
+```
+kubectl --context=${CLUSTER2} apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ledgerwriter
+  namespace: default
+spec:
+  parentRefs:
+  - group: ""
+    kind: Service
+    name: ledgerwriter
+    port: 9080
+  rules:
+  - backendRefs:
+    - name: ledgerwriter-1
+      port: 8080
+  - backendRefs:
+    - name: ledgerwriter-2
+      port: 8080
+EOF
 ```
 
 ### Expose Bank of Anthos using Istio Gateway
