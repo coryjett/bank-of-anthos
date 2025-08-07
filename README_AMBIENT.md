@@ -270,14 +270,14 @@ kubectl label namespace istio-system --context ${CLUSTER2} topology.istio.io/net
 
 Expose using an east-west gateway:
 
-#### Istioctl
-
 ```
 istioctl --context=${CLUSTER1} multicluster expose --wait -n istio-gateways
 istioctl --context=${CLUSTER2} multicluster expose --wait -n istio-gateways
 ```
 
-#### YAML
+<details>
+
+<summary>Instead of using istioctl, you can also apply yaml</summary>
 
 ```
 kubectl apply --context $CLUSTER1 -f- <<EOF
@@ -331,13 +331,15 @@ spec:
 EOF
 ```
 
-Link clusters together:
+</details>
 
-#### Istioctl
+Link clusters together:
 
 `istioctl multicluster link --contexts=$CLUSTER1,$CLUSTER2 -n istio-gateways`
 
-#### YAML
+<details>
+
+<summary>Instead of using istioctl, you can also apply yaml</summary>
 
 ```
 export CLUSTER1_EW_ADDRESS=$(kubectl get svc -n istio-gateways istio-eastwest --context $CLUSTER1 -o jsonpath="{.status.loadBalancer.ingress[0]['hostname','ip']}")
@@ -404,6 +406,8 @@ spec:
       mode: Passthrough
 EOF
 ```
+
+</details>
 
 ### Deploy Bank of Anthos
 
