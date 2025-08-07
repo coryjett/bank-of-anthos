@@ -270,14 +270,140 @@ kubectl label namespace istio-system --context ${CLUSTER2} topology.istio.io/net
 
 Expose using an east-west gateway:
 
+#### Istioctl
+
 ```
 istioctl --context=${CLUSTER1} multicluster expose --wait -n istio-gateways
 istioctl --context=${CLUSTER2} multicluster expose --wait -n istio-gateways
 ```
 
-Link clusters together
+#### YAML
+
+```
+kubectl apply --context $CLUSTER1 -f- <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  labels:
+    istio.io/expose-istiod: "15012"
+    topology.istio.io/network: cluster1
+  name: istio-eastwest
+  namespace: istio-gateways
+spec:
+  gatewayClassName: istio-eastwest
+  listeners:
+  - name: cross-network
+    port: 15008
+    protocol: HBONE
+    tls:
+      mode: Passthrough
+  - name: xds-tls
+    port: 15012
+    protocol: TLS
+    tls:
+      mode: Passthrough
+EOF
+```
+
+```
+kubectl apply --context $CLUSTER2 -f- <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  labels:
+    istio.io/expose-istiod: "15012"
+    topology.istio.io/network: cluster2
+  name: istio-eastwest
+  namespace: istio-gateways
+spec:
+  gatewayClassName: istio-eastwest
+  listeners:
+  - name: cross-network
+    port: 15008
+    protocol: HBONE
+    tls:
+      mode: Passthrough
+  - name: xds-tls
+    port: 15012
+    protocol: TLS
+    tls:
+      mode: Passthrough
+EOF
+```
+
+Link clusters together:
+
+#### Istioctl
 
 `istioctl multicluster link --contexts=$CLUSTER1,$CLUSTER2 -n istio-gateways`
+
+#### YAML
+
+```
+export CLUSTER1_EW_ADDRESS=$(kubectl get svc -n istio-gateways istio-eastwest --context $CLUSTER1 -o jsonpath="{.status.loadBalancer.ingress[0]['hostname','ip']}")
+export CLUSTER2_EW_ADDRESS=$(kubectl get svc -n istio-gateways istio-eastwest --context $CLUSTER2 -o jsonpath="{.status.loadBalancer.ingress[0]['hostname','ip']}")
+
+echo "Cluster 1 east-west gateway: $CLUSTER1_EW_ADDRESS"
+echo "Cluster 2 east-west gateway: $CLUSTER2_EW_ADDRESS"
+
+kubectl apply --context $CLUSTER1 -f- <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  annotations:
+    gateway.istio.io/service-account: istio-eastwest
+    gateway.istio.io/trust-domain: cluster2
+  labels:
+    topology.istio.io/network: cluster2
+  name: istio-remote-peer-cluster2
+  namespace: istio-gateways
+spec:
+  addresses:
+  - type: IPAddress
+    value: $CLUSTER2_EW_ADDRESS
+  gatewayClassName: istio-remote
+  listeners:
+  - name: cross-network
+    port: 15008
+    protocol: HBONE
+    tls:
+      mode: Passthrough
+  - name: xds-tls
+    port: 15012
+    protocol: TLS
+    tls:
+      mode: Passthrough
+EOF
+
+kubectl apply --context $CLUSTER2 -f- <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  annotations:
+    gateway.istio.io/service-account: istio-eastwest
+    gateway.istio.io/trust-domain: cluster1
+  labels:
+    topology.istio.io/network: cluster1
+  name: istio-remote-peer-cluster1
+  namespace: istio-gateways
+spec:
+  addresses:
+  - type: IPAddress
+    value: $CLUSTER1_EW_ADDRESS
+  gatewayClassName: istio-remote
+  listeners:
+  - name: cross-network
+    port: 15008
+    protocol: HBONE
+    tls:
+      mode: Passthrough
+  - name: xds-tls
+    port: 15012
+    protocol: TLS
+    tls:
+      mode: Passthrough
+EOF
+```
 
 ### Deploy Bank of Anthos
 
