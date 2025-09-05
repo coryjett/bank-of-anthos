@@ -717,13 +717,13 @@ helm upgrade --install gloo-platform-crds gloo-platform-crds \
   --namespace gloo-mesh \
   --set installEnterpriseCrds=false \
   --kube-context ${CLUSTER2} \
-  --version 2.7.1
+  --version 2.8.0
 
 helm upgrade --install gloo-platform gloo-platform \
   --repo https://storage.googleapis.com/gloo-platform/helm-charts \
   --namespace gloo-mesh \
   --kube-context ${CLUSTER2} \
-  --version 2.7.1 \
+  --version 2.8.0 \
   -f -<<EOF
 common:
   cluster: cluster2
