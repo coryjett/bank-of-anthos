@@ -661,8 +661,8 @@ Cluster1 will act as the management cluster and workload cluster:
 helm repo add gloo-platform https://storage.googleapis.com/gloo-platform/helm-charts
 helm repo update
 
-helm upgrade --kube-context ${CLUSTER1} -i gloo-platform-crds gloo-platform/gloo-platform-crds -n gloo-mesh --create-namespace --version=2.7.1
-helm upgrade --kube-context ${CLUSTER1} -i gloo-platform gloo-platform/gloo-platform -n gloo-mesh --version 2.7.1 --values gloo-mgmt-values.yaml --set licensing.glooMeshLicenseKey=$GLOO_MESH_LICENSE_KEY
+helm upgrade --kube-context ${CLUSTER1} -i gloo-platform-crds gloo-platform/gloo-platform-crds -n gloo-mesh --create-namespace --version=2.8.0
+helm upgrade --kube-context ${CLUSTER1} -i gloo-platform gloo-platform/gloo-platform -n gloo-mesh --version 2.8.0 --values gloo-mgmt-values.yaml --set licensing.glooMeshLicenseKey=$GLOO_MESH_LICENSE_KEY
 ```
 
 Then, you need to set the environment variables with the management plane addresses. These variables will be used to configure the Gloo Mesh agents in cluster2:
