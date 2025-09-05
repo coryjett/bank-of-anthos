@@ -28,7 +28,6 @@ spec:
       targetPort: 8080
   selector:
     app: ledgerwriter
-    version: v1
     application: bank-of-anthos
     environment: development
     team: ledger

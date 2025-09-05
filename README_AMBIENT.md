@@ -7,14 +7,14 @@ export CLUSTER1=cluster1
 export CLUSTER2=cluster2
 export GLOO_MESH_LICENSE_KEY=<update>  # UPDATE THIS
 
-export ISTIO_VERSION=1.26.2
+export ISTIO_VERSION=1.26.3
 export REPO_KEY=d4cba2aff3ef
 export ISTIO_IMAGE=${ISTIO_VERSION}-solo
 export REPO=us-docker.pkg.dev/gloo-mesh/istio-${REPO_KEY}
 export HELM_REPO=us-docker.pkg.dev/gloo-mesh/istio-helm-${REPO_KEY}
 ```
 
-Download Solo's 1.26.2 istioctl Binary:
+Download Solo's 1.26.3 istioctl Binary:
 
 ```
 OS=$(uname | tr '[:upper:]' '[:lower:]' | sed -E 's/darwin/osx/')
